@@ -1,0 +1,8 @@
+{
+  "name": "Mechanic Co-Pilot Super-App",
+  "description": "An AI-powered assistant for mechanics providing real-time diagnostics, torque specs, and repair SOPs based on vehicle issues.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

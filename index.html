@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mechanic Co-Pilot</title>
+    <!-- Tailwind via CDN is kept for simplicity to match existing styles without complex postcss setup -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+              mono: ['JetBrains Mono', 'monospace'],
+            },
+            colors: {
+              slate: {
+                850: '#1e293b', 
+                950: '#020617',
+              }
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      body {
+        background-color: #0f172a; /* Slate 950 */
+        color: #e2e8f0; /* Slate 200 */
+      }
+      /* Custom Scrollbar for technical feel */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #1e293b; 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #475569; 
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #64748b; 
+      }
+
+      /* --- PRINT SPECIFIC STYLES --- */
+      @media print {
+        @page {
+          size: A4;
+          margin: 10mm 15mm 10mm 15mm; /* Top Right Bottom Left */
+        }
+        
+        /* CRITICAL: Reset SPA (Single Page App) constraints */
+        html, body, #root {
+          height: auto !important;
+          min-height: 0 !important;
+          overflow: visible !important;
+          background-color: white !important;
+          color: black !important;
+          display: block !important;
+          position: relative !important;
+        }
+
+        /* Hide scrollbars in print to avoid ugly lines */
+        ::-webkit-scrollbar {
+          display: none !important;
+        }
+
+        /* Ensure text is dark and readable */
+        * {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+          text-shadow: none !important;
+          box-shadow: none !important;
+        }
+
+        /* Smart Page Breaks */
+        .break-inside-avoid {
+          break-inside: avoid !important;
+          page-break-inside: avoid !important;
+          display: block; /* Helps firefox/chrome respect the break */
+        }
+        
+        h1, h2, h3 {
+          break-after: avoid;
+          page-break-after: avoid;
+        }
+
+        /* Ensure links are underlined in print for clarity if needed, or plain text */
+        a {
+          text-decoration: none;
+          color: black !important;
+        }
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react": "https://esm.sh/react@^19.2.4",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.4",
+    "vite": "https://esm.sh/vite@^7.3.1",
+    "@google/genai": "https://esm.sh/@google/genai@^1.41.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+    <!-- Point to the TypeScript entry file for Vite -->
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
