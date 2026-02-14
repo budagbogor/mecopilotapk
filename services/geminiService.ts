@@ -1,8 +1,9 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { MechanicResponse } from "../types";
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
 
 // --- NVIDIA FALLBACK CONFIGURATION ---
-const NVIDIA_API_KEY = "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"; 
+const NVIDIA_API_KEY = "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";
 // Use Proxy path instead of direct URL to avoid CORS
 const NVIDIA_BASE_URL = "/api/nvidia";
 const NVIDIA_MODEL = "meta/llama-3.1-405b-instruct";
@@ -40,9 +41,9 @@ const mechanicResponseSchema: Schema = {
           symptoms_match: { type: Type.STRING, description: "Gejala yang mirip dalam Bahasa Indonesia." },
           solution_steps: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Langkah penanganan dalam Bahasa Indonesia yang instruktif." },
           video_ref: {
-             type: Type.OBJECT,
-             properties: { title: {type: Type.STRING}, url: {type: Type.STRING} },
-             required: ["title", "url"]
+            type: Type.OBJECT,
+            properties: { title: { type: Type.STRING }, url: { type: Type.STRING } },
+            required: ["title", "url"]
           },
           image_search_keywords: { type: Type.STRING, description: "Keyword spesifik visual part rusak/lokasi untuk digenerate." }
         },
@@ -105,9 +106,9 @@ const mechanicResponseSchema: Schema = {
             items: {
               type: Type.OBJECT,
               properties: {
-                 brand: { type: Type.STRING },
-                 part_number: { type: Type.STRING },
-                 estimated_price: { type: Type.STRING }
+                brand: { type: Type.STRING },
+                part_number: { type: Type.STRING },
+                estimated_price: { type: Type.STRING }
               },
               required: ["brand", "part_number", "estimated_price"]
             },
@@ -262,46 +263,83 @@ async function getNvidiaAdvice(input: string, media: MediaInput | null, systemIn
 
   messages.push({ role: "user", content: userContent });
 
-  // Use NVIDIA_BASE_URL which now points to local proxy /api/nvidia
-  const response = await fetch(`${NVIDIA_BASE_URL}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${NVIDIA_API_KEY}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      model: NVIDIA_MODEL,
-      messages: messages,
-      temperature: 0.2,
-      max_tokens: 4096,
-      stream: false
-    })
-  });
+  // Check if running on Native Android/iOS
+  if (Capacitor.isNativePlatform()) {
+    // Use Native HTTP to bypass CORS
+    const response = await CapacitorHttp.post({
+      url: `https://integrate.api.nvidia.com/v1/chat/completions`,
+      headers: {
+        "Authorization": `Bearer ${NVIDIA_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      data: {
+        model: NVIDIA_MODEL,
+        messages: messages,
+        temperature: 0.2,
+        max_tokens: 4096,
+        stream: false
+      }
+    });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Nvidia API Error (${response.status}): ${errorText}`);
-  }
+    if (response.status !== 200) {
+      throw new Error(`Nvidia API Error (${response.status}): ${JSON.stringify(response.data)}`);
+    }
 
-  const data = await response.json();
-  const content = data.choices[0]?.message?.content;
+    // CapacitorHttp returns data already parsed as JSON usually, but let's be safe
+    const data = response.data;
+    const content = data.choices[0]?.message?.content;
+    if (!content) throw new Error("No content from Nvidia API (Native)");
 
-  if (!content) throw new Error("No content from Nvidia API");
+    try {
+      const cleanJson = content.replace(/```json|```/g, "").trim();
+      return JSON.parse(cleanJson) as MechanicResponse;
+    } catch (e) {
+      console.error("Failed to parse Nvidia JSON response", content);
+      throw new Error("Failed to parse AI response (Fallback Mode).");
+    }
 
-  // Clean and parse
-  try {
-    const cleanJson = content.replace(/```json|```/g, "").trim();
-    return JSON.parse(cleanJson) as MechanicResponse;
-  } catch (e) {
-    console.error("Failed to parse Nvidia JSON response", content);
-    throw new Error("Failed to parse AI response (Fallback Mode).");
+  } else {
+    // Web Mode (Use Proxy)
+    const response = await fetch(`${NVIDIA_BASE_URL}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${NVIDIA_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: NVIDIA_MODEL,
+        messages: messages,
+        temperature: 0.2,
+        max_tokens: 4096,
+        stream: false
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Nvidia API Error (${response.status}): ${errorText}`);
+    }
+
+    const data = await response.json();
+    const content = data.choices[0]?.message?.content;
+
+    if (!content) throw new Error("No content from Nvidia API");
+
+    // Clean and parse
+    try {
+      const cleanJson = content.replace(/```json|```/g, "").trim();
+      return JSON.parse(cleanJson) as MechanicResponse;
+    } catch (e) {
+      console.error("Failed to parse Nvidia JSON response", content);
+      throw new Error("Failed to parse AI response (Fallback Mode).");
+    }
   }
 }
 
 export const getMechanicAdvice = async (input: string, media?: MediaInput | null, customApiKey?: string): Promise<MechanicResponse> => {
   // Use custom key if provided, otherwise fallback to env
   const apiKey = customApiKey || process.env.API_KEY;
-  
+
   // FALLBACK LOGIC
   if (!apiKey) {
     console.warn("Gemini API Key missing. Attempting Nvidia Fallback...");
@@ -316,7 +354,7 @@ export const getMechanicAdvice = async (input: string, media?: MediaInput | null
     if (media) {
       // Strip generic base64 headers if present to get clean data
       const cleanData = media.data.replace(/^data:(image|audio)\/[a-z0-9.-]+;base64,/, "");
-      
+
       parts.push({
         inlineData: {
           mimeType: media.mimeType,
@@ -333,15 +371,15 @@ export const getMechanicAdvice = async (input: string, media?: MediaInput | null
         responseMimeType: "application/json",
         responseSchema: mechanicResponseSchema,
         temperature: 0.2,
-        thinkingConfig: { thinkingBudget: 0 } 
+        thinkingConfig: { thinkingBudget: 0 }
       },
     });
 
     const text = response.text;
     if (!text) {
-        throw new Error("No response from AI");
+      throw new Error("No response from AI");
     }
-    
+
     return JSON.parse(text) as MechanicResponse;
 
   } catch (error) {
